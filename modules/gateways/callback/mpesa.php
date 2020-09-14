@@ -1,4 +1,5 @@
 <?php
+
 /**
  * WHMCS Merchant Gateway 3D Secure Callback File
  *
@@ -33,154 +34,151 @@ $gatewayParams = getGatewayVariables($gatewayModuleName);
 
 // Die if module is not active.
 if (!$gatewayParams['type']) {
-    die("Module Not Activated");
+	die("Module Not Activated");
 }
 
 // Die if not accessed properly.
-if ( ! isset( $_GET['lnm_action'] ) ) return;
+if (!isset($_GET['lnm_action'])) {
+	return;
+}
 
-$response = json_decode( file_get_contents( 'php://input' ), true );
-if( ! isset( $response['Body'] ) ) return;
+$response = json_decode(file_get_contents('php://input'), true);
+if (!isset($response['Body'])) {
+	return;
+}
 
-header( "Access-Control-Allow-Origin: *" );
-header( 'Content-Type:Application/json' );
+header("Access-Control-Allow-Origin: *");
+header('Content-Type:Application/json');
 
-if ( $_GET['lnm_action'] == 'confirm' ){
-  echo json_encode(
-    array(
-      'ResponseCode'  => 0, 
-      'ResponseDesc'  => 'Success',
-      'ThirdPartyTransID' => 0
-    )
-  );
-} elseif ( $_GET['lnm_action'] == 'validate' ){
-  echo json_encode(
-    array(
-      'ResponseCode'  => 0, 
-      'ResponseDesc'  => 'Success',
-      'ThirdPartyTransID' => 0
-    )
-  );
-} else{
-    $resultCode                         = $response['Body']['stkCallback']['ResultCode'];
-    $resultDesc                         = $response['Body']['stkCallback']['ResultDesc'];
-    $merchantRequestID                  = $response['Body']['stkCallback']['MerchantRequestID'];
-    $transactionId                      = $response['Body']['stkCallback']['CheckoutRequestID'];
+switch ($_GET['lnm_action']) {
+	case 'confirm':
+		echo json_encode(
+			array(
+				'ResponseCode'      => 0,
+				'ResponseDesc'      => 'Success',
+				'ThirdPartyTransID' => 0,
+			)
+		);
+		break;
+	case 'validate':
+		echo json_encode(
+			array(
+				'ResponseCode'      => 0,
+				'ResponseDesc'      => 'Success',
+				'ThirdPartyTransID' => 0,
+			)
+		);
+		break;
 
-    if( isset( $response['Body']['stkCallback']['CallbackMetadata'] ) ){
-        $paymentAmount                  = $response['Body']['stkCallback']['CallbackMetadata']['Item'][0]['Value'];
-        $mpesaReceiptNumber             = $response['Body']['stkCallback']['CallbackMetadata']['Item'][1]['Value'];
-        $balance                        = $response['Body']['stkCallback']['CallbackMetadata']['Item'][2]['Value'];
-        $transactionDate                = $response['Body']['stkCallback']['CallbackMetadata']['Item'][3]['Value'];
-        $phone                          = $response['Body']['stkCallback']['CallbackMetadata']['Item'][4]['Value'];
-        $success                        = true;
-    } else {
-        $success                        = false;
-    }
-    
-    $invoiceId                          = $transactionId;
-    $transactionStatus                  = $success ? 'Success' : 'Failure';
+	default:
+		$resultCode        = $response['Body']['stkCallback']['ResultCode'];
+		$resultDesc        = $response['Body']['stkCallback']['ResultDesc'];
+		$merchantRequestID = $response['Body']['stkCallback']['MerchantRequestID'];
+		$transactionId     = $response['Body']['stkCallback']['CheckoutRequestID'];
 
-    // Retrieve data returned in payment gateway callback
-    // Varies per payment gateway
-    // $success = $_POST["x_status"];
-    // $invoiceId = $_POST["x_invoice_id"];
-    // $transactionId = $_POST["x_trans_id"];
-    // $paymentAmount = $_POST["x_amount"];
-    // $paymentFee = $_POST["x_fee"];
-    // $hash = $_POST["x_hash"];
+		if (isset($response['Body']['stkCallback']['CallbackMetadata'])) {
+			$paymentAmount      = $response['Body']['stkCallback']['CallbackMetadata']['Item'][0]['Value'];
+			$mpesaReceiptNumber = $response['Body']['stkCallback']['CallbackMetadata']['Item'][1]['Value'];
+			$balance            = $response['Body']['stkCallback']['CallbackMetadata']['Item'][2]['Value'];
+			$transactionDate    = $response['Body']['stkCallback']['CallbackMetadata']['Item'][3]['Value'];
+			$phone              = $response['Body']['stkCallback']['CallbackMetadata']['Item'][4]['Value'];
+			$success            = true;
+		} else {
+			$success = false;
+		}
 
-    // $transactionStatus = $success ? 'Success' : 'Failure';
+		$invoiceId         = $merchantRequestID;
+		$transactionStatus = $success ? 'Success' : 'Failure';
 
-    /**
-     * Validate callback authenticity.
-     *
-     * Most payment gateways provide a method of verifying that a callback
-     * originated from them. In the case of our example here, this is achieved by
-     * way of a shared secret which is used to build and compare a hash.
-     */
-    $secretKey = $gatewayParams['secretKey'];
-    if ($hash != md5($secretKey . $invoiceId . $transactionId . $paymentAmount)) {
-        $transactionStatus = 'Hash Verification Failure';
-        $success = false;
-    }
+		// Retrieve data returned in payment gateway callback
+		// Varies per payment gateway
+		// $success = $_POST["x_status"];
+		// $invoiceId = $_POST["x_invoice_id"];
+		// $transactionId = $_POST["x_trans_id"];
+		// $paymentAmount = $_POST["x_amount"];
+		// $paymentFee = $_POST["x_fee"];
+		// $hash = $_POST["x_hash"];
 
-    /**
-     * Validate Callback Invoice ID.
-     *
-     * Checks invoice ID is a valid invoice number. Note it will count an
-     * invoice in any status as valid.
-     *
-     * Performs a die upon encountering an invalid Invoice ID.
-     *
-     * Returns a normalised invoice ID.
-     *
-     * @param int $invoiceId Invoice ID
-     * @param string $gatewayName Gateway Name
-     */
-    $invoiceId = checkCbInvoiceID($invoiceId, $gatewayParams['name']);
+		// $transactionStatus = $success ? 'Success' : 'Failure';
 
-    /**
-     * Check Callback Transaction ID.
-     *
-     * Performs a check for any existing transactions with the same given
-     * transaction number.
-     *
-     * Performs a die upon encountering a duplicate.
-     *
-     * @param string $transactionId Unique Transaction ID
-     */
-    checkCbTransID($transactionId);
+		/**
+		 * Validate callback authenticity.
+		 *
+		 * Most payment gateways provide a method of verifying that a callback
+		 * originated from them. In the case of our example here, this is achieved by
+		 * way of a shared secret which is used to build and compare a hash.
+		 */
+		// $secretKey = $gatewayParams['secretKey'];
+		// if ($hash != md5($secretKey . $invoiceId . $transactionId . $paymentAmount)) {
+		// 	$transactionStatus = 'Hash Verification Failure';
+		// 	$success           = false;
+		// }
 
-    /**
-     * Log Transaction.
-     *
-     * Add an entry to the Gateway Log for debugging purposes.
-     *
-     * The debug data can be a string or an array. In the case of an
-     * array it will be
-     *
-     * @param string $gatewayName        Display label
-     * @param string|array $debugData    Data to log
-     * @param string $transactionStatus  Status
-     */
-    logTransaction($gatewayParams['name'], $_POST, $transactionStatus);
+		/**
+		 * Validate Callback Invoice ID.
+		 *
+		 * Checks invoice ID is a valid invoice number. Note it will count an
+		 * invoice in any status as valid.
+		 *
+		 * Performs a die upon encountering an invalid Invoice ID.
+		 *
+		 * Returns a normalised invoice ID.
+		 *
+		 * @param int $invoiceId Invoice ID
+		 * @param string $gatewayName Gateway Name
+		 */
+		$invoiceId = checkCbInvoiceID($invoiceId, $gatewayParams['name']);
 
-    $paymentSuccess = false;
+		/**
+		 * Check Callback Transaction ID.
+		 *
+		 * Performs a check for any existing transactions with the same given
+		 * transaction number.
+		 *
+		 * Performs a die upon encountering a duplicate.
+		 *
+		 * @param string $transactionId Unique Transaction ID
+		 */
+		checkCbTransID($transactionId);
 
-    if ($success) {
+		/**
+		 * Log Transaction.
+		 *
+		 * Add an entry to the Gateway Log for debugging purposes.
+		 *
+		 * The debug data can be a string or an array. In the case of an
+		 * array it will be
+		 *
+		 * @param string $gatewayName        Display label
+		 * @param string|array $debugData    Data to log
+		 * @param string $transactionStatus  Status
+		 */
+		logTransaction($gatewayParams['name'], $_POST, $transactionStatus);
 
-        /**
-         * Add Invoice Payment.
-         *
-         * Applies a payment transaction entry to the given invoice ID.
-         *
-         * @param int $invoiceId         Invoice ID
-         * @param string $transactionId  Transaction ID
-         * @param float $paymentAmount   Amount paid (defaults to full balance)
-         * @param float $paymentFee      Payment fee (optional)
-         * @param string $gatewayModule  Gateway module name
-         */
-        addInvoicePayment(
-            $invoiceId,
-            $transactionId,
-            $paymentAmount,
-            $paymentFee,
-            $gatewayModuleName
-        );
+		$paymentSuccess = false;
 
-        $paymentSuccess = true;
+		if ($success) {
 
-    }
+			/**
+			 * Add Invoice Payment.
+			 *
+			 * Applies a payment transaction entry to the given invoice ID.
+			 *
+			 * @param int $invoiceId         Invoice ID
+			 * @param string $transactionId  Transaction ID
+			 * @param float $paymentAmount   Amount paid (defaults to full balance)
+			 * @param float $paymentFee      Payment fee (optional)
+			 * @param string $gatewayModule  Gateway module name
+			 */
+			addInvoicePayment(
+				$invoiceId,
+				$transactionId,
+				$paymentAmount,
+				$paymentFee,
+				$gatewayModuleName
+			);
 
-    /**
-     * Redirect to invoice.
-     *
-     * Performs redirect back to the invoice upon completion of the 3D Secure
-     * process displaying the transaction result along with the invoice.
-     *
-     * @param int $invoiceId        Invoice ID
-     * @param bool $paymentSuccess  Payment status
-     */
-    callback3DSecureRedirect($invoiceId, $paymentSuccess);
+			$paymentSuccess = true;
+		}
+		break;
 }

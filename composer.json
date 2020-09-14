@@ -1,5 +1,5 @@
 {
-    "name": "whmcs/sample-merchant-gateway",
+    "name": "osenco/osen-whmcs-mpesa",
     "description": "Lipa Na Mpesa for the WHMCS Billing Automation Platform",
     "keywords": [
         "whmcs",
